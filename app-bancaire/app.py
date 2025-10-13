@@ -5,14 +5,12 @@ import datetime
 app = Flask(__name__)
 
 # VULNERABILITY: Hardcoded secret key for secret scanning tools
-app.secret_key = "super_secret_key_12345_DO_NOT_COMMIT"
-
-# VULNERABILITY: Hardcoded API keys
-API_KEY = "sk_live_51234567890abcdefghijklmnop"
-DATABASE_PASSWORD = "admin123password"
-AWS_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-
 # In-memory user database (simulating SQL database)
+
+
+
+
+
 users_db = {
     "admin": {
         "password": "admin123",
