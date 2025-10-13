@@ -1,0 +1,12 @@
+# kubernetes/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: banking-api-service
+spec:
+  selector:
+    app: banking-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000

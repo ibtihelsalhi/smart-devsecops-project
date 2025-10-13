@@ -1,0 +1,21 @@
+# kubernetes/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-api-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: banking-api
+  template:
+    metadata:
+      labels:
+        app: banking-api
+    spec:
+      containers:
+      - name: banking-api
+        image: banking-api:v1
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 5000

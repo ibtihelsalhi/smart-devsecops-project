@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virement - SecureBank</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">SecureBank</div>
+        <div class="nav-links">
+            <a href="{{ url_for('dashboard') }}">Tableau de bord</a>
+            <a href="{{ url_for('transfer') }}" class="active">Virement</a>
+            <a href="{{ url_for('profile') }}">Profil</a>
+            <a href="{{ url_for('logout') }}" class="btn-logout">Déconnexion</a>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="page-header">
+            <h1>Effectuer un virement</h1>
+            <p>Transférez de l'argent vers un autre compte</p>
+        </div>
+        
+        {% if error %}
+        <div class="alert alert-error">
+            {{ error }}
+        </div>
+        {% endif %}
+        
+        {% if success %}
+        <div class="alert alert-success">
+            {{ success }}
+        </div>
+        {% endif %}
+        
+        <div class="card transfer-card">
+            <form method="POST" action="{{ url_for('transfer') }}">
+                <div class="form-group">
+                    <label for="recipient">Destinataire (nom d'utilisateur)</label>
+                    <input type="text" id="recipient" name="recipient" required placeholder="user1, user2, admin...">
+                    <small>Comptes disponibles : admin, user1, user2</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="amount">Montant (€)</label>
+                    <input type="number" id="amount" name="amount" step="0.01" min="0.01" required placeholder="100.00">
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Effectuer le virement</button>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">Annuler</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

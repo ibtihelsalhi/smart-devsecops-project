@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profil - SecureBank</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">SecureBank</div>
+        <div class="nav-links">
+            <a href="{{ url_for('dashboard') }}">Tableau de bord</a>
+            <a href="{{ url_for('transfer') }}">Virement</a>
+            <a href="{{ url_for('profile') }}" class="active">Profil</a>
+            <a href="{{ url_for('logout') }}" class="btn-logout">Déconnexion</a>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="page-header">
+            <h1>Mon profil</h1>
+            <p>Informations de votre compte</p>
+        </div>
+        
+        <div class="card profile-card">
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    {{ user.name[0].upper() }}
+                </div>
+                <div class="profile-info">
+                    <h2>{{ user.name }}</h2>
+                    <p class="username">@{{ username }}</p>
+                </div>
+            </div>
+            
+            <div class="profile-details">
+                <div class="detail-row">
+                    <span class="detail-label">Numéro de compte</span>
+                    <span class="detail-value">{{ user.account_number }}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Solde actuel</span>
+                    <span class="detail-value balance-highlight">{{ "%.2f"|format(user.balance) }} €</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Nombre de transactions</span>
+                    <span class="detail-value">{{ user.transactions|length }}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Type de compte</span>
+                    <span class="detail-value">{% if username == 'admin' %}Administrateur{% else %}Standard{% endif %}</span>
+                </div>
+            </div>
+            
+            <div class="profile-actions">
+                <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Retour au tableau de bord</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
