@@ -1,0 +1,65 @@
+# shift-left-configs/semgrep_rules.yml
+rules:
+  - id: python.flask.hardcoded-secret.app-secret-key
+    message: |
+      La clé secrète (secret_key) de Flask est codée en dur. C'est une faille de sécurité
+      critique. La clé doit être chargée depuis une variable d'environnement ou un
+      gestionnaire de secrets.
+    severity: ERROR
+    languages:
+      - python
+    patterns:
+      - pattern: app.secret_key = "..."
+
+  - id: python.flask.hardcoded-credentials.hardcoded-password
+    message: |
+      Un mot de passe a été trouvé en dur dans le code (users_db). Le stockage d'identifiants
+      sensibles directement dans le code est un risque de sécurité majeur.
+    severity: ERROR
+    languages:
+      - python
+    patterns:
+      - pattern: |
+          users_db = {
+              ...,
+              "$USER": {
+                  "password": "$PASSWORD",
+                  ...
+              },
+              ...
+          }
+        metavariable-regex:
+          PASSWORD: "[a-zA-Z0-9!@#$%^&*]+"
+
+  - id: python.flask.sql-injection.simulated-sql-injection
+    message: |
+      Une vulnérabilité de type injection SQL (simulée) a été détectée. La logique de l'application
+      vérifie directement la présence de la chaîne "' OR '1'='1'", ce qui indique une
+      faille de sécurité potentielle.
+    severity: ERROR
+    languages:
+      - python
+    patterns:
+      - pattern-regex: |
+          if\s+"'\s+OR\s+'1'='1"\s+in\s+username\s+or\s+"'\s+OR\s+'1'='1"\s+in\s+password:
+
+  - id: python.flask.insecure-session-config.debug-mode-enabled
+    message: |
+      L'application Flask est exécutée avec le mode DEBUG activé (app.run(debug=True)).
+      Le mode DEBUG ne doit JAMAIS être activé dans un environnement de production.
+    severity: ERROR
+    languages:
+      - python
+    patterns:
+      - pattern-regex: |
+          app.run\s*\\(\s*debug=True
+
+  - id: generic.secrets.hardcoded-api-key-or-password
+    message: |
+      Une clé d'API ou un mot de passe (API_KEY, DATABASE_PASSWORD, AWS_SECRET_KEY) semble
+      être codé en dur. Les secrets ne doivent jamais être présents dans le code source.
+    severity: ERROR
+    languages:
+      - python
+    patterns:
+      - pattern-regex: (API_KEY|DATABASE_PASSWORD|AWS_SECRET_KEY)\s*=\s*".+"

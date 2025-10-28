@@ -1,0 +1,30 @@
+# .github/workflows/gitleaks-scan.yml
+name: 'Détection de Secrets (Gitleaks) et Rapport'
+
+on:
+  workflow_dispatch:
+
+jobs:
+  gitleaks_job:
+    runs-on: ubuntu-latest
+    name: Exécuter Gitleaks et générer le rapport
+
+    steps:
+      - name: 'Récupération du code source complet'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Essentiel pour que Gitleaks scanne tout l'historique
+
+      - name: 'Exécuter l"analyse Gitleaks'
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          # Spécifie le format et le chemin du rapport
+          args: 'detect --report-format json --report-path gitleaks-report.json'
+        # Continue même si des secrets sont trouvés, pour pouvoir générer le rapport
+        continue-on-error: true
+
+      - name: 'Sauvegarder le rapport Gitleaks en tant qu"artefact'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json

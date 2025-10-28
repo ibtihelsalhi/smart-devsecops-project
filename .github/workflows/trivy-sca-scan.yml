@@ -1,0 +1,73 @@
+# .github/workflows/trivy-sca-scan.yml
+name: 'Analyse de Dépendances (Trivy SCA) et Rapport'
+
+on:
+  workflow_dispatch:
+
+jobs:
+  trivy_sca_job:
+    runs-on: ubuntu-latest
+    name: Exécuter Trivy SCA et générer le rapport
+
+    steps:
+      - name: 'Récupération du code source'
+        uses: actions/checkout@v4
+
+      - name: 'Exécuter l"analyse de dépendances Trivy'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './app-bancaire'
+          # Spécifie le format JSON et le fichier de sortie
+          format: 'json'
+          output: 'trivy-sca-report.json'
+          # On ne veut pas que le scan s'arrête, on veut le rapport
+          exit-code: '0' 
+      
+      - name: 'Sauvegarder le rapport Trivy SCA en tant qu"artefact'
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-sca-report
+          path: trivy-sca-report.json```
+**Explication :**
+*   `format: 'json'` et `output: 'trivy-sca-report.json'` sont les paramètres spécifiques à l'action Trivy pour générer le rapport.
+*   `exit-code: '0'` empêche le workflow d'échouer s'il trouve des vulnérabilités, garantissant que l'étape de sauvegarde du rapport sera toujours atteinte.
+
+---
+
+#### **4. Checkov : Analyse IaC et Rapport JSON**
+
+Créez le fichier `.github/workflows/checkov-scan.yml` :
+
+```yaml
+# .github/workflows/checkov-scan.yml
+name: 'Analyse IaC (Checkov) et Rapport'
+
+on:
+  workflow_dispatch:
+
+jobs:
+  checkov_job:
+    runs-on: ubuntu-latest
+    name: Exécuter Checkov et générer le rapport
+
+    steps:
+      - name: 'Récupération du code source'
+        uses: actions/checkout@v4
+
+      - name: 'Exécuter l"analyse Checkov'
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: ./kubernetes
+          # Spécifie le format de sortie
+          output_format: json
+          # Nom du fichier de sortie
+          output_file_path: checkov-report.json
+          # On ne bloque pas le pipeline pour obtenir le rapport
+          soft_fail: true
+
+      - name: 'Sauvegarder le rapport Checkov en tant qu"artefact'
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkov-report
+          path: checkov-report.json

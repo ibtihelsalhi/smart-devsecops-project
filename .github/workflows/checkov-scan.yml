@@ -1,0 +1,32 @@
+# .github/workflows/checkov-scan.yml
+name: 'Analyse IaC (Checkov) et Rapport'
+
+on:
+  workflow_dispatch:
+
+jobs:
+  checkov_job:
+    runs-on: ubuntu-latest
+    name: Exécuter Checkov et générer le rapport
+
+    steps:
+      - name: 'Récupération du code source'
+        uses: actions/checkout@v4
+
+      - name: 'Exécuter l"analyse Checkov'
+        uses: bridgecrewio/checkov-action@master
+        with:
+          # Le dossier contenant les fichiers d'infrastructure (.yaml) à analyser
+          directory: ./kubernetes
+          # Le format de sortie
+          output_format: json
+          # Le nom du fichier de rapport à créer
+          output_file_path: checkov-report.json
+          # On ne bloque pas le pipeline pour obtenir le rapport
+          soft_fail: true
+
+      - name: 'Sauvegarder le rapport Checkov en tant qu"artefact'
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkov-report
+          path: checkov-report.json

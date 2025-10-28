@@ -1,0 +1,25 @@
+# shift-left-configs/gitleaks_config.toml
+
+title = "Gitleaks config for Smart DevSecOps Project"
+
+# Les règles par défaut de Gitleaks sont activées. Elles détecteront la clé AWS
+# et la clé de type Stripe (API_KEY) automatiquement.
+# Nous ajoutons des règles personnalisées pour les autres secrets.
+
+[[rules]]
+description = "Hardcoded Flask Secret Key"
+id = "flask-secret-key"
+regex = '''app\.secret_key\s*=\s*['"](super_secret_key_12345_DO_NOT_COMMIT)['"]'''
+tags = ["secret", "flask", "hardcoded"]
+
+[[rules]]
+description = "Hardcoded Database Password Variable"
+id = "hardcoded-db-password-var"
+regex = '''DATABASE_PASSWORD\s*=\s*['"]([a-zA-Z0-9!@#$%^&*]+)['"]'''
+tags = ["password", "database", "hardcoded"]
+
+[[rules]]
+description = "Hardcoded User Passwords in DB dictionary"
+id = "hardcoded-user-password-dict"
+regex = '''(?i)(password\s*:\s*["'])([a-zA-Z0-9!@#$%^&*]{6,})'''
+tags = ["password", "hardcoded", "mock-db"]

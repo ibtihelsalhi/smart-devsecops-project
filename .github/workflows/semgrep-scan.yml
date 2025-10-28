@@ -1,0 +1,29 @@
+# .github/workflows/semgrep-scan.yml
+name: 'Analyse SAST (Semgrep) et Rapport'
+
+on:
+  workflow_dispatch: # Permet de lancer ce workflow manuellement depuis l'onglet Actions
+
+jobs:
+  semgrep_job:
+    runs-on: ubuntu-latest
+    name: Exécuter Semgrep et générer le rapport
+    
+    steps:
+      - name: 'Récupération du code source'
+        uses: actions/checkout@v4
+
+      - name: 'Exécuter l"analyse Semgrep'
+        # Utilise l'image Docker officielle pour plus de fiabilité
+        uses: returntocorp/semgrep-action@v1
+        with:
+          # On spécifie le format de sortie JSON et le nom du fichier
+          # La commande `semgrep ci` est exécutée par défaut
+          args: '--config="auto" --json -o semgrep-report.json'
+      
+      - name: 'Sauvegarder le rapport Semgrep en tant qu"artefact'
+        # Cette étape cruciale permet de télécharger le fichier généré
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-report # Nom de l'artefact dans GitHub
+          path: semgrep-report.json # Chemin vers le fichier à sauvegarder
