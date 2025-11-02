@@ -1,32 +1,44 @@
 # .github/workflows/main.yaml
 name: Smart DevSecOps CI/CD Pipeline
 
-# Déclencheur : ce pipeline se lancera à chaque push sur la branche "main"
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch: # Permet de lancer le pipeline manuellement
 
 jobs:
-  # Premier Job : Construire, Tester et Pousser l'image Docker
   build-and-test:
-    runs-on: ubuntu-latest # Ce job tournera sur une machine virtuelle Linux fournie par GitHub
-
+    runs-on: ubuntu-latest
     steps:
-      # Étape 1 : Récupérer le code de votre dépôt
+      # --- ÉTAPE 1 : RÉCUPÉRER LE CODE ---
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ===================================================================
-      # == ESPACE RÉSERVÉ POUR LE TRAVAIL DE MEMBRE 2 (SHIFT-LEFT) ==
-      # Plus tard, nous insérerons ici les blocs de code pour Semgrep,
-      # Gitleaks, et les autres outils d'analyse statique.
-      # Chaque étape sera une "action" du GitHub Marketplace.
-      # exemple :
-      # - name: Run Semgrep SAST Scan
-      #   uses: semgrep/semgrep-action@v1
-      # ===================================================================
+      # --- ÉTAPE 2 : SCANS DE SÉCURITÉ "SHIFT-LEFT" ---
+      - name: 'SECURITY: Scan for secrets with Gitleaks'
+        uses: gitleaks/gitleaks-action@v2
 
-      # Étape 2 : Se connecter au registre de conteneurs de GitHub
+      - name: 'SECURITY: Scan source code with Semgrep'
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: "auto"
+
+      - name: 'SECURITY: Scan IaC files with Checkov'
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: ./kubernetes
+          soft_fail: false
+
+      - name: 'SECURITY: Scan dependencies with Trivy (SCA)'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './app-bancaire'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+
+      # --- ÉTAPE 3 : CONSTRUIRE L'IMAGE DOCKER ---
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -34,24 +46,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Étape 3 : Construire l'image Docker et la pousser sur le registre
       - name: Build and push Docker image
+        id: build-and-push # On donne un ID à cette étape pour la réutiliser
         uses: docker/build-push-action@v5
         with:
-          context: ./app-bancaire # Le Dockerfile se trouve dans ce dossier
+          context: ./app-bancaire
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
 
-  # =======================================================================
-  # == JOB FUTUR : DÉPLOYER ==
-  # Dans la Phase 2, nous ajouterons un deuxième job ici qui ne se
-  # lancera que si "build-and-test" a réussi. Il se chargera du
-  # déploiement sur Kubernetes et des tests DAST (OWASP ZAP).
-  #
-  # deploy:
-  #   needs: build-and-test
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Deploy to Kubernetes
-  #       ...
-  # =======================================================================
+      # --- ÉTAPE 4 : SCAN DE L'IMAGE CONSTRUITE ---
+      - name: 'SECURITY: Scan Docker image with Trivy'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          image-ref: 'ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: trues
