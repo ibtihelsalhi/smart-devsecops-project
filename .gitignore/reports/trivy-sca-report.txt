@@ -1,0 +1,52 @@
+
+Report Summary
+
+┌──────────────────┬──────┬─────────────────┬─────────┐
+│      Target      │ Type │ Vulnerabilities │ Secrets │
+├──────────────────┼──────┼─────────────────┼─────────┤
+│ requirements.txt │ pip  │        3        │    -    │
+├──────────────────┼──────┼─────────────────┼─────────┤
+│ app.py           │ text │        -        │    1    │
+└──────────────────┴──────┴─────────────────┴─────────┘
+Legend:
+- '-': Not scanned
+- '0': Clean (no security findings detected)
+
+
+requirements.txt (pip)
+======================
+Total: 3 (UNKNOWN: 0, LOW: 0, MEDIUM: 2, HIGH: 1, CRITICAL: 0)
+
+┌──────────┬────────────────┬──────────┬────────┬───────────────────┬───────────────┬───────────────────────────────────────────────────────────┐
+│ Library  │ Vulnerability  │ Severity │ Status │ Installed Version │ Fixed Version │                           Title                           │
+├──────────┼────────────────┼──────────┼────────┼───────────────────┼───────────────┼───────────────────────────────────────────────────────────┤
+│ Werkzeug │ CVE-2024-34069 │ HIGH     │ fixed  │ 3.0.1             │ 3.0.3         │ python-werkzeug: user may execute code on a developer's   │
+│          │                │          │        │                   │               │ machine                                                   │
+│          │                │          │        │                   │               │ https://avd.aquasec.com/nvd/cve-2024-34069                │
+│          ├────────────────┼──────────┤        │                   ├───────────────┼───────────────────────────────────────────────────────────┤
+│          │ CVE-2024-49766 │ MEDIUM   │        │                   │ 3.0.6         │ werkzeug: python-werkzeug: Werkzeug safe_join not safe on │
+│          │                │          │        │                   │               │ Windows                                                   │
+│          │                │          │        │                   │               │ https://avd.aquasec.com/nvd/cve-2024-49766                │
+│          ├────────────────┤          │        │                   │               ├───────────────────────────────────────────────────────────┤
+│          │ CVE-2024-49767 │          │        │                   │               │ werkzeug: python-werkzeug: Werkzeug possible resource     │
+│          │                │          │        │                   │               │ exhaustion when parsing file data in forms...             │
+│          │                │          │        │                   │               │ https://avd.aquasec.com/nvd/cve-2024-49767                │
+└──────────┴────────────────┴──────────┴────────┴───────────────────┴───────────────┴───────────────────────────────────────────────────────────┘
+
+app.py (secrets)
+================
+Total: 1 (UNKNOWN: 0, LOW: 0, MEDIUM: 0, HIGH: 0, CRITICAL: 1)
+
+CRITICAL: Stripe (stripe-secret-token)
+════════════════════════════════════════
+Stripe Secret Key
+────────────────────────────────────────
+ app.py:11 (offset: 320 bytes)
+────────────────────────────────────────
+   9   
+  10   # VULNERABILITY: Hardcoded API keys
+  11 [ API_KEY = "***********************************"
+  12   DATABASE_PASSWORD = "admin123password"
+────────────────────────────────────────
+
+
