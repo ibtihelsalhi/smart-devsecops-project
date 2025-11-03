@@ -11,7 +11,7 @@ jobs:
   security-pipeline:
     name: Full Security Pipeline
     runs-on: ubuntu-latest
-    permissions: write-all# On garde write pour la fin
+    permissions: write-all # On garde write pour la fin
     
     steps:
       # --- ÉTAPE 1 : RÉCUPÉRER LE CODE ---
