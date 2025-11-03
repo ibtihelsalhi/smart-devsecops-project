@@ -72,7 +72,7 @@ jobs:
           ignore-unfixed: true
 
   # ================================================================
-  # JOB 2: SCAN DYNAMIQUE (DAST)
+  # JOB 2: SCAN DYNAMIQUE (DAST)#
   # ================================================================
   dast-scan:
     name: Dynamic Analysis (DAST)
