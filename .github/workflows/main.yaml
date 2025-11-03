@@ -70,7 +70,7 @@ jobs:
         with:
           target: 'http://localhost:5000/'
           fail_action: false
-
+          artifact_name: zap-scan-report     # <--- AJOUTEZ CETTE LIGNE
       # --- ÉTAPE 6 (Optionnelle) : Pousser l'image SI tout a réussi ---
       - name: Log in to GitHub Container Registry
         if: success() # Ne se lance que si toutes les étapes précédentes sont vertes
