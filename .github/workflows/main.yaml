@@ -75,36 +75,31 @@ jobs:
   # ================================================================
   # JOB 2: SCAN DYNAMIQUE (DAST)
   # ================================================================
-  dast-scan:
-    name: Dynamic Analysis (DAST)
-    # Ce job ne commencera que si le job 'build-and-test' a réussi.
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    
-    permissions:      # <--- AJOUTEZ CETTE LIGNE
-      contents: read  # <--- AJOUTEZ CETTE LIGNE
-      packages: read # <--- AJOUTEZ CETTE LIGNE (juste "read" car il ne fait que lire l'image)
+dast-scan:
+  name: Dynamic Analysis (DAST)
+  needs: build-and-test
+  runs-on: ubuntu-latest
+  permissions:
+    contents: read
+    packages: read
+  steps:
+    # --- AJOUTEZ CETTE NOUVELLE ÉTAPE ICI ---
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    # ----------------------------------------
 
+    - name: Run application in background for DAST scan
+      run: |
+        docker run -d --name banking-app -p 5000:5000 ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
+        echo "Waiting 20 seconds for the application to start..."
+        sleep 20
 
-
-    steps:
-      # Étape 1 : On démarre l'application en arrière-plan
-      - name: Run application in background for DAST scan
-        run: |
-          # On utilise l'image Docker qui a été construite et poussée dans le job précédent
-          docker run -d --name banking-app -p 5000:5000 ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
-          
-          # On attend 20 secondes pour être sûr que l'application a eu le temps de démarrer
-          echo "Waiting 20 seconds for the application to start..."
-          sleep 20
-
-      # Étape 2 : On lance le scan OWASP ZAP contre l'application qui tourne
-      - name: 'SECURITY: Run OWASP ZAP Baseline Scan'
-        uses: zaproxy/action-baseline@v0.10.0
-        with:
-          # L'URL cible est localhost:5000 car ZAP et l'application tournent
-          # dans le même environnement (le runner de GitHub Actions)
-          target: 'http://localhost:5000/'
-          # Pour le test, on ne bloque pas le pipeline si ZAP trouve des failles.
-          # Mettez 'true' plus tard pour une sécurité maximale.
-          fail_action: false
+    - name: 'SECURITY: Run OWASP ZAP Baseline Scan'
+      uses: zaproxy/action-baseline@v0.10.0
+      with:
+        target: 'http://localhost:5000/'
+        fail_action: false
