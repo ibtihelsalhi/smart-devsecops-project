@@ -1,7 +1,6 @@
 # .github/workflows/main.yaml
 name: Smart DevSecOps CI/CD Pipeline
 
-# Déclencheurs : se lance à chaque push sur "main" ou manuellement
 on:
   push:
     branches: [ "main" ]
@@ -14,28 +13,28 @@ jobs:
   build-and-test:
     name: Build and Static Analysis
     runs-on: ubuntu-latest
-    permissions:      # <--- AJOUTEZ CETTE LIGNE
-      contents: read  # <--- AJOUTEZ CETTE LIGNE
-      packages: write # <--- AJOUTEZ CETTE LIGNE
+    permissions:
+      contents: read
+      packages: write
     steps:
       # --- ÉTAPE 1 : RÉCUPÉRER LE CODE ---
       - name: Checkout code
         uses: actions/checkout@v4
 
       # --- ÉTAPE 2 : SCANS DE SÉCURITÉ "SHIFT-LEFT" ---
-     # - name: 'SECURITY: Scan for secrets with Gitleaks'
-      #  uses: gitleaks/gitleaks-action@v2
+      # - name: 'SECURITY: Scan for secrets with Gitleaks'
+      #   uses: gitleaks/gitleaks-action@v2
 
-    #  - name: 'SECURITY: Scan source code with Semgrep'
-    #    uses: semgrep/semgrep-action@v1
-    #    with:
-     #     config: "auto"
+      # - name: 'SECURITY: Scan source code with Semgrep'
+      #   uses: semgrep/semgrep-action@v1
+      #   with:
+      #     config: "auto"
 
       - name: 'SECURITY: Scan IaC files with Checkov'
         uses: bridgecrewio/checkov-action@master
         with:
           directory: ./kubernetes
-          soft_fail: true  
+          soft_fail: true
 
       - name: 'SECURITY: Scan dependencies with Trivy (SCA)'
         uses: aquasecurity/trivy-action@master
@@ -73,33 +72,31 @@ jobs:
           ignore-unfixed: true
 
   # ================================================================
-  # JOB 2: SCAN DYNAMIQUE (DAST)###############
+  # JOB 2: SCAN DYNAMIQUE (DAST)
   # ================================================================
-dast-scan:
-  name: Dynamic Analysis (DAST)
-  needs: build-and-test
-  runs-on: ubuntu-latest
-  permissions:
-    contents: read
-    packages: read
-  steps:
-    # --- AJOUTEZ CETTE NOUVELLE ÉTAPE ICI ---
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    # ----------------------------------------
+  dast-scan:
+    name: Dynamic Analysis (DAST)
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Run application in background for DAST scan
-      run: |
-        docker run -d --name banking-app -p 5000:5000 ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
-        echo "Waiting 20 seconds for the application to start..."
-        sleep 20
+      - name: Run application in background for DAST scan
+        run: |
+          docker run -d --name banking-app -p 5000:5000 ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
+          echo "Waiting 20 seconds for the application to start..."
+          sleep 20
 
-    - name: 'SECURITY: Run OWASP ZAP Baseline Scan'
-      uses: zaproxy/action-baseline@v0.10.0
-      with:
-        target: 'http://localhost:5000/'
-        fail_action: false
+      - name: 'SECURITY: Run OWASP ZAP Baseline Scan'
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: 'http://localhost:5000/'
+          fail_action: false
