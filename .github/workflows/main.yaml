@@ -7,28 +7,18 @@ on:
   workflow_dispatch:
 
 jobs:
-  # --- UN SEUL ET UNIQUE JOB POUR TOUT FAIRE ---
   security-pipeline:
     name: Full Security Pipeline
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    
+    permissions: write-all # Donne toutes les permissions nécessaires
+
     steps:
-      # --- ÉTAPE 1 : RÉCUPÉRER LE CODE ---
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # --- ÉTAPE 2 : SCANS DE SÉCURITÉ "SHIFT-LEFT" ---
-      # (Commentés pour le test, vous pourrez les réactiver plus tard)
-      # - name: 'SECURITY: Scan for secrets with Gitleaks'
-      #   uses: gitleaks/gitleaks-action@v2
-
-      # - name: 'SECURITY: Scan source code with Semgrep'
-      #   uses: semgrep/semgrep-action@v1
-      #   with:
-      #     config: "auto"
+      # (Les scans sont commentés pour le test)
+      # - name: 'SECURITY: Scan for secrets with Gitleaks' ...
+      # - name: 'SECURITY: Scan source code with Semgrep' ...
 
       - name: 'SECURITY: Scan IaC files with Checkov'
         uses: bridgecrewio/checkov-action@master
@@ -45,17 +35,14 @@ jobs:
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
 
-      # --- ÉTAPE 3 : CONSTRUIRE L'IMAGE DOCKER (mais sans la "pousser" tout de suite) ---
-      - name: Build Docker image
+      - name: Build Docker image locally
         id: build
         uses: docker/build-push-action@v5
         with:
           context: ./app-bancaire
-          # IMPORTANT: On ne la pousse pas encore, on la charge localement
           load: true
           tags: banking-api-local:${{ github.sha }}
 
-      # --- ÉTAPE 4 : SCAN DE L'IMAGE CONSTRUITE ---
       - name: 'SECURITY: Scan Docker image with Trivy'
         uses: aquasecurity/trivy-action@master
         with:
@@ -65,7 +52,6 @@ jobs:
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
 
-      # --- ÉTAPE 5 : SCAN DYNAMIQUE (DAST) ---
       - name: Run application in background for DAST scan
         run: |
           docker run -d --name banking-app -p 5000:5000 banking-api-local:${{ github.sha }}
@@ -78,14 +64,13 @@ jobs:
           target: 'http://localhost:5000/'
           fail_action: false
 
-      # --- ÉTAPE 6 (Optionnelle mais recommandée) : Pousser l'image SI tout a réussi ---
       - name: Log in to GitHub Container Registry
-        if: success() # Ne se lance que si toutes les étapes précédentes ont réussi
+        if: success()
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.PAT }} # On garde le PAT pour la robustesse
+          password: ${{ secrets.PAT }} # On utilise toujours le PAT pour le push
 
       - name: Push image to GHCR
         if: success()
