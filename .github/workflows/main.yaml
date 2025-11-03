@@ -7,21 +7,21 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ================================================================
-  # JOB 1: ANALYSE STATIQUE ET CONSTRUCTION DE L'IMAGE
-  # ================================================================
-  build-and-test:
-    name: Build and Static Analysis
+  # --- UN SEUL ET UNIQUE JOB POUR TOUT FAIRE ---
+  security-pipeline:
+    name: Full Security Pipeline
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    
     steps:
       # --- ÉTAPE 1 : RÉCUPÉRER LE CODE ---
       - name: Checkout code
         uses: actions/checkout@v4
 
       # --- ÉTAPE 2 : SCANS DE SÉCURITÉ "SHIFT-LEFT" ---
+      # (Commentés pour le test, vous pourrez les réactiver plus tard)
       # - name: 'SECURITY: Scan for secrets with Gitleaks'
       #   uses: gitleaks/gitleaks-action@v2
 
@@ -45,53 +45,30 @@ jobs:
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
 
-      # --- ÉTAPE 3 : CONSTRUIRE L'IMAGE DOCKER ---
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.PAT }}
-
-      - name: Build and push Docker image
-        id: build-and-push
+      # --- ÉTAPE 3 : CONSTRUIRE L'IMAGE DOCKER (mais sans la "pousser" tout de suite) ---
+      - name: Build Docker image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: ./app-bancaire
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
+          # IMPORTANT: On ne la pousse pas encore, on la charge localement
+          load: true
+          tags: banking-api-local:${{ github.sha }}
 
       # --- ÉTAPE 4 : SCAN DE L'IMAGE CONSTRUITE ---
       - name: 'SECURITY: Scan Docker image with Trivy'
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'image'
-          image-ref: 'ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}'
+          image-ref: 'banking-api-local:${{ github.sha }}'
           format: 'table'
           severity: 'CRITICAL,HIGH'
           ignore-unfixed: true
 
-  # ================================================================
-  # JOB 2: SCAN DYNAMIQUE (DAST)#
-  # ================================================================
-  dast-scan:
-    name: Dynamic Analysis (DAST)
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: read
-    steps:
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.PAT }}
-
+      # --- ÉTAPE 5 : SCAN DYNAMIQUE (DAST) ---
       - name: Run application in background for DAST scan
         run: |
-          docker run -d --name banking-app -p 5000:5000 ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
+          docker run -d --name banking-app -p 5000:5000 banking-api-local:${{ github.sha }}
           echo "Waiting 20 seconds for the application to start..."
           sleep 20
 
@@ -100,3 +77,18 @@ jobs:
         with:
           target: 'http://localhost:5000/'
           fail_action: false
+
+      # --- ÉTAPE 6 (Optionnelle mais recommandée) : Pousser l'image SI tout a réussi ---
+      - name: Log in to GitHub Container Registry
+        if: success() # Ne se lance que si toutes les étapes précédentes ont réussi
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.PAT }} # On garde le PAT pour la robustesse
+
+      - name: Push image to GHCR
+        if: success()
+        run: |
+          docker tag banking-api-local:${{ github.sha }} ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
+          docker push ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
