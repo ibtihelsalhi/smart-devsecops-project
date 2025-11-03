@@ -1,9 +1,0 @@
-# kubernetes/test-bad-pod.yaml
-apiVersion: v1
-kind: Pod
-metadata:
-  name: test-pod-with-latest-tag
-spec:
-  containers:
-  - name: nginx-container
-    image: nginx:latest  # <-- C'est la violation de notre politique !
