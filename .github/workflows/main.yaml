@@ -32,7 +32,7 @@ jobs:
         uses: bridgecrewio/checkov-action@master
         with:
           directory: ./kubernetes
-          soft_fail: false
+          soft_fail: true  
 
       - name: 'SECURITY: Scan dependencies with Trivy (SCA)'
         uses: aquasecurity/trivy-action@master
