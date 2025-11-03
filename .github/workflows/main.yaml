@@ -14,6 +14,9 @@ jobs:
   build-and-test:
     name: Build and Static Analysis
     runs-on: ubuntu-latest
+    permissions:      # <--- AJOUTEZ CETTE LIGNE
+      contents: read  # <--- AJOUTEZ CETTE LIGNE
+      packages: write # <--- AJOUTEZ CETTE LIGNE
     steps:
       # --- ÉTAPE 1 : RÉCUPÉRER LE CODE ---
       - name: Checkout code
@@ -77,6 +80,13 @@ jobs:
     # Ce job ne commencera que si le job 'build-and-test' a réussi.
     needs: build-and-test
     runs-on: ubuntu-latest
+    
+    permissions:      # <--- AJOUTEZ CETTE LIGNE
+      contents: read  # <--- AJOUTEZ CETTE LIGNE
+      packages: read # <--- AJOUTEZ CETTE LIGNE (juste "read" car il ne fait que lire l'image)
+
+
+
     steps:
       # Étape 1 : On démarre l'application en arrière-plan
       - name: Run application in background for DAST scan
