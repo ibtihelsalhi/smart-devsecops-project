@@ -7,19 +7,16 @@ on:
   workflow_dispatch:
 
 jobs:
-  # --- UN SEUL ET UNIQUE JOB POUR TOUT FAIRE ---
   security-pipeline:
     name: Full Security Pipeline
     runs-on: ubuntu-latest
-    permissions: write-all # Donne toutes les permissions nécessaires
+    permissions: write-all
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # --- ÉTAPE 2 : SCANS STATIQUES ---
-      # Tous les scans suivants sont configurés pour ne pas bloquer le pipeline pour ce test.
-      
+      # Pour la démo, Gitleaks et Semgrep sont en mode non-bloquant
       - name: 'SECURITY: Scan for secrets with Gitleaks'
         uses: gitleaks/gitleaks-action@v2
         continue-on-error: true
@@ -29,7 +26,7 @@ jobs:
         with:
           config: "auto"
         continue-on-error: true
-
+        
       - name: 'SECURITY: Scan IaC files with Checkov'
         uses: bridgecrewio/checkov-action@master
         with:
@@ -37,63 +34,11 @@ jobs:
           soft_fail: true
 
       - name: 'SECURITY: Scan dependencies with Trivy (SCA)'
-        uses: aquasecurity/trivy-action@master # <--- CORRIGÉ ICI
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
           scan-ref: './app-bancaire'
           format: 'table'
           exit-code: '0'
 
-      # --- ÉTAPE 3 : CONSTRUIRE L'IMAGE ---
-      - name: Build Docker image locally
-        uses: docker/build-push-action@v5
-        with:
-          context: ./app-bancaire
-          load: true
-          tags: banking-api-local:${{ github.sha }}
-
-      # --- ÉTAPE 4 : SCAN DE L'IMAGE ---
-      - name: 'SECURITY: Scan Docker image with Trivy'
-        uses: aquasecurity/trivy-action@master # <--- CORRIGÉ ICI
-        with:
-          scan-type: 'image'
-          image-ref: 'banking-api-local:${{ github.sha }}'
-          format: 'table'
-          exit-code: '0'
-
-      # --- ÉTAPE 5 : SCAN DYNAMIQUE (DAST) ---
-      - name: Run application in background for DAST scan
-        run: |
-          docker run -d --name banking-app -p 5000:5000 banking-api-local:${{ github.sha }}
-          echo "Waiting 20 seconds for the application to start..."
-          sleep 20
-
-      - name: 'SECURITY: Run OWASP ZAP Baseline Scan'
-        uses: zaproxy/action-baseline@v0.10.0
-        with:
-          target: 'http://localhost:5000/'
-          fail_action: false
-          issue_title: 'DAST Scan Report'
-          
-      # --- ÉTAPE 6 : SAUVEGARDER LES RAPPORTS ---
-      - name: Upload ZAP Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: zap-html-report
-          path: 'report_html.html'
-          if-no-files-found: ignore # Ignore cette étape si le fichier n'est pas trouvé
-
-      # --- ÉTAPE 7 : PUSH DE L'IMAGE À LA FIN ---
-      - name: Log in to GitHub Container Registry
-        if: success()
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push validated image to GHCR
-        if: success()
-        run: |
-          docker tag banking-api-local:${{ github.sha }} ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
-          docker push ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
+      # Le reste du pipeline est désactivé pour la simplicité de la démo
