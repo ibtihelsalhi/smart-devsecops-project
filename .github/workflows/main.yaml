@@ -41,7 +41,7 @@ jobs:
         uses: aqusecurity/trivy-action@master
         with:
           scan-type: 'fs'
-          scan-ref: './app-bancaire'
+          scan-ref: '../app-bancaire'
           format: 'table'
           exit-code: '0' # Ne bloque pas le pipeline
 
