@@ -78,7 +78,7 @@ jobs:
         with:
           target: 'http://localhost:5000/'
           fail_action: false
-          artifact_name: zap-scan-report
+          artifact_name: hii
         continue-on-error: true
 
       # ---------------------------
@@ -87,8 +87,8 @@ jobs:
       - name: Upload ZAP Scan Report
         uses: actions/upload-artifact@v4
         with:
-          name: zap-scan-report
-          path: ./zap-scan-report.html
+          name: hii
+          path: ./hii.html
         continue-on-error: true
 
       # ---------------------------
