@@ -68,7 +68,7 @@ jobs:
         with:
           target: 'http://localhost:5000/'
           fail_action: false
-          artifact_name: zap_scan_report_${{ github.run_id }} # Nom de rapport valide
+          artifact_name: zapscan # Nom de rapport valide
 
       # --- PUSH DE L'IMAGE À LA FIN ---
       - name: Log in to GitHub Container Registry
