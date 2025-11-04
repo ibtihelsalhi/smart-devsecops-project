@@ -45,7 +45,7 @@ jobs:
           format: 'table'
           exit-code: '0'
       
-      # L'ÉTAPE ZAP A ÉTÉ SUPPRIMÉE
+      # L'ÉTAPiE ZAP A ÉTÉ SUPPRIMÉE
 
       - name: Log in to GitHub Container Registry
         if: success()
