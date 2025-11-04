@@ -1,4 +1,3 @@
-# .github/workflows/main.yaml
 name: Smart DevSecOps CI/CD Pipeline
 
 on:
@@ -7,74 +6,106 @@ on:
   workflow_dispatch:
 
 jobs:
-  # --- UN SEUL ET UNIQUE JOB POUR TOUT FAIRE ---
   security-pipeline:
     name: Full Security Pipeline
     runs-on: ubuntu-latest
-    permissions: write-all # Donne toutes les permissions nécessaires
+    permissions:
+      contents: write       # nécessaire pour GitHub Pages
+      packages: write
+      actions: write
+      security-events: write
 
     steps:
+      # ---------------------------
+      # 1️⃣ Cloner le dépôt
+      # ---------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # --- ÉTAPE 2 : SCANS STATIQUES ---
-      # (Gitleaks et Semgrep sont commentés pour permettre au pipeline de réussir pour le moment)
-      # - name: 'SECURITY: Scan for secrets with Gitleaks'
-      #   uses: gitleaks/gitleaks-action@v2
-      #
-      # - name: 'SECURITY: Scan source code with Semgrep'
-      #   uses: semgrep/semgrep-action@v1
-      #   with:
-      #     config: "auto"
-
+      # ---------------------------
+      # 2️⃣ Analyse IaC (Terraform, K8s, etc.)
+      # ---------------------------
       - name: 'SECURITY: Scan IaC files with Checkov'
         uses: bridgecrewio/checkov-action@master
         with:
           directory: ./kubernetes
           soft_fail: true
 
+      # ---------------------------
+      # 3️⃣ Analyse SCA (Dépendances) avec Trivy
+      # ---------------------------
       - name: 'SECURITY: Scan dependencies with Trivy (SCA)'
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
           scan-ref: './app-bancaire'
           format: 'table'
-          severity: 'CRITICAL,HIGH'
-          ignore-unfixed: true
+          exit-code: '0'  # Continue même si vulnérabilités trouvées
 
-      # --- ÉTAPE 3 : CONSTRUIRE L'IMAGE (SANS LA POUSSER) ---
+      # ---------------------------
+      # 4️⃣ Construction de l'image Docker
+      # ---------------------------
       - name: Build Docker image locally
-        id: build
         uses: docker/build-push-action@v5
         with:
           context: ./app-bancaire
           load: true
           tags: banking-api-local:${{ github.sha }}
 
-      # --- ÉTAPE 4 : SCAN DE L'IMAGE LOCALE ---
+      # ---------------------------
+      # 5️⃣ Scan de l'image Docker (Trivy Image)
+      # ---------------------------
       - name: 'SECURITY: Scan Docker image with Trivy'
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'image'
           image-ref: 'banking-api-local:${{ github.sha }}'
           format: 'table'
-          severity: 'CRITICAL,HIGH'
-          ignore-unfixed: true
+          exit-code: '0'
 
-      # --- ÉTAPE 5 : SCAN DYNAMIQUE (DAST) ---
+      # ---------------------------
+      # 6️⃣ Lancer l’application pour DAST (OWASP ZAP)
+      # ---------------------------
       - name: Run application in background for DAST scan
         run: |
           docker run -d --name banking-app -p 5000:5000 banking-api-local:${{ github.sha }}
           echo "Waiting 20 seconds for the application to start..."
           sleep 20
 
-      - name: 'SECURITY: Run OWASP ZAP Baseline Scan'
-        uses: zaproxy/action-baseline@v0.10.0
-        with:
-          target: 'http://localhost:5000/'
-          fail_action: false
+      # ---------------------------
+      # 7️⃣ OWASP ZAP via Docker (sans bug d’artefact)
+      # ---------------------------
+      - name: Run OWASP ZAP Baseline Scan (Manual Docker)
+        run: |
+          docker run --network host \
+            -v $(pwd):/zap/wrk/:rw \
+            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+            -t http://localhost:5000 \
+            -r zap_report.html || true
 
-      # --- ÉTAPE 6 (Optionnelle) : Pousser l'image SI tout a réussi ---
+      # ---------------------------
+      # 8️⃣ Upload manuel du rapport ZAP
+      # ---------------------------
+      - name: Upload ZAP Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap_report
+          path: zap_report.html
+
+      # ---------------------------
+      # 9️⃣ Publication du rapport ZAP sur GitHub Pages (bonus)
+      # ---------------------------
+      - name: Publish ZAP Report to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          publish_branch: gh-pages
+          keep_files: true
+
+      # ---------------------------
+      # 🔟 Connexion à GitHub Container Registry (GHCR)
+      # ---------------------------
       - name: Log in to GitHub Container Registry
         if: success()
         uses: docker/login-action@v3
@@ -83,8 +114,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.PAT }}
 
+      # ---------------------------
+      # 1️⃣1️⃣ Push de l'image validée dans GHCR
+      # ---------------------------
       - name: Push validated image to GHCR
         if: success()
         run: |
-          docker tag banking-api-local:${{ github.sha }} ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
-          docker push ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
+          IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
+          docker tag banking-api-local:${{ github.sha }} $IMAGE_NAME
+          docker push $IMAGE_NAME
