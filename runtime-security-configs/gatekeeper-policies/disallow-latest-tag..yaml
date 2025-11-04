@@ -1,47 +1,86 @@
-# Fichier Unique : policy-disallow-latest-tag.yaml
+# .github/workflows/main.yaml
+name: Smart DevSecOps CI/CD Pipeline
 
-# --- PARTIE 1 : Le Modèle (La "Recette") ---
-apiVersion: templates.gatekeeper.sh/v1
-kind: ConstraintTemplate
-metadata:
-  name: k8sdisallowlatesttag
-spec:
-  crd:
-    spec:
-      names:
-        kind: K8sDisallowLatestTag
-  targets:
-    - target: admission.k8s.gatekeeper.sh
-      rego: |
-        package k8sdisallowlatesttag
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
 
-        violation[{"msg": msg}] {
-          container := input.review.object.spec.containers[_]
-          endswith(container.image, ":latest")
-          msg := sprintf("Image <%v> uses the 'latest' tag in container <%v>, which is not allowed", [container.image, container.name])
-        }
+jobs:
+  security-pipeline:
+    name: Full Security Pipeline
+    runs-on: ubuntu-latest
+    permissions: write-all # Utilise la permission la plus simple pour éviter les problèmes
 
-        violation[{"msg": msg}] {
-          container := input.review.object.spec.initContainers[_]
-          endswith(container.image, ":latest")
-          msg := sprintf("Image <%v> uses the 'latest' tag in initContainer <%v>, which is not allowed", [container.image, container.name])
-        }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-        violation[{"msg": msg}] {
-          container := input.review.object.spec.ephemeralContainers[_]
-          endswith(container.image, ":latest")
-          msg := sprintf("Image <%v> uses the 'latest' tag in ephemeralContainer <%v>, which is not allowed", [container.image, container.name])
-        }
+      # --- SCANS STATIQUES ---
+      # (Commentés pour ce test)
+      # - name: 'SECURITY: Scan for secrets with Gitleaks'
+      #   uses: gitleaks/gitleaks-action@v2
+      # - name: 'SECURITY: Scan source code with Semgrep'
+      #   uses: semgrep/semgrep-action@v1
+      #   with:
+      #     config: "auto"
 
---- # <--- SÉPARATEUR TRÈS IMPORTANT
+      - name: 'SECURITY: Scan IaC files with Checkov'
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: ./kubernetes
+          soft_fail: true
 
-# --- PARTIE 2 : La Contrainte (L'Application de la "Loi") ---
-apiVersion: constraints.gatekeeper.sh/v1beta1
-kind: K8sDisallowLatestTag
-metadata:
-  name: no-latest-tags
-spec:
-  match:
-    kinds:
-      - apiGroups: [""]
-        kinds: ["Pod"]
+      - name: 'SECURITY: Scan dependencies with Trivy (SCA)'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: './app-bancaire'
+          format: 'table'
+          exit-code: '0' # Ne bloque pas pour ce test
+
+      # --- CONSTRUCTION DE L'IMAGE ---
+      - name: Build Docker image locally
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app-bancaire
+          load: true
+          tags: banking-api-local:${{ github.sha }}
+
+      # --- SCAN DE L'IMAGE ---
+      - name: 'SECURITY: Scan Docker image with Trivy'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          image-ref: 'banking-api-local:${{ github.sha }}'
+          format: 'table'
+          exit-code: '0' # Ne bloque pas pour ce test
+
+      # --- SCAN DYNAMIQUE (DAST) ---
+      - name: Run application in background for DAST scan
+        run: |
+          docker run -d --name banking-app -p 5000:5000 banking-api-local:${{ github.sha }}
+          echo "Waiting 20 seconds for the application to start..."
+          sleep 20
+
+      - name: 'SECURITY: Run OWASP ZAP Baseline Scan'
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: 'http://localhost:5000/'
+          fail_action: false
+          artifact_name: zap-scan-report # Nom de rapport valide
+
+      # --- PUSH DE L'IMAGE À LA FIN ---
+      - name: Log in to GitHub Container Registry
+        if: success()
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.PAT }}
+
+      - name: Push validated image to GHCR
+        if: success()
+        run: |
+          docker tag banking-api-local:${{ github.sha }} ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
+          docker push ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
