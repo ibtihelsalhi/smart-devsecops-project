@@ -87,7 +87,7 @@ jobs:
       - name: Upload ZAP Scan Report
         uses: actions/upload-artifact@v4
         with:
-          name: hzap_scan
+          name: zap_scan
           path: ./zap_scan.html
         continue-on-error: true
 
