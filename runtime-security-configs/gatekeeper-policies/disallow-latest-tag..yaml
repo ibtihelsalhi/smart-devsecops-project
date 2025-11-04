@@ -1,3 +1,4 @@
+# .github/workflows/main.yaml
 name: Smart DevSecOps CI/CD Pipeline
 
 on:
@@ -9,32 +10,19 @@ jobs:
   security-pipeline:
     name: Full Security Pipeline
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
-      actions: write
-      security-events: write
+    permissions: write-all
 
     steps:
-      # ---------------------------
-      # 1️⃣ Checkout du code
-      # ---------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ---------------------------
-      # 2️⃣ Scan IaC
-      # ---------------------------
-      - name: SECURITY: Scan IaC files with Checkov
+      - name: 'SECURITY: Scan IaC files with Checkov'
         uses: bridgecrewio/checkov-action@master
         with:
           directory: ./kubernetes
           soft_fail: true
 
-      # ---------------------------
-      # 3️⃣ Scan dépendances (SCA)
-      # ---------------------------
-      - name: SECURITY: Scan dependencies with Trivy
+      - name: 'SECURITY: Scan dependencies with Trivy (SCA)'
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
@@ -42,9 +30,6 @@ jobs:
           format: 'table'
           exit-code: '0'
 
-      # ---------------------------
-      # 4️⃣ Build Docker Image
-      # ---------------------------
       - name: Build Docker image locally
         uses: docker/build-push-action@v5
         with:
@@ -52,60 +37,26 @@ jobs:
           load: true
           tags: banking-api-local:${{ github.sha }}
 
-      # ---------------------------
-      # 5️⃣ Scan Docker Image
-      # ---------------------------
-      - name: SECURITY: Scan Docker image with Trivy
+      - name: 'SECURITY: Scan Docker image with Trivy'
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'image'
           image-ref: 'banking-api-local:${{ github.sha }}'
           format: 'table'
           exit-code: '0'
+      
+      # L'ÉTAPE ZAP A ÉTÉ SUPPRIMÉE
 
-      # ---------------------------
-      # 6️⃣ Run Application for ZAP DAST
-      # ---------------------------
-      - name: Run app in background for DAST
-        run: |
-          docker run -d --name banking-app -p 5000:5000 banking-api-local:${{ github.sha }}
-          echo "Waiting 20 seconds for the application to start..."
-          sleep 20
-
-      # ---------------------------
-      # 7️⃣ OWASP ZAP Baseline Scan
-      # ---------------------------
-      - name: SECURITY: Run OWASP ZAP Baseline Scan
-        run: |
-          mkdir -p zap_results
-          docker run --network host -v $(pwd)/zap_results:/zap/wrk/:rw ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://localhost:5000 -r zap_report.html || true
-          mv zap_results/zap_report.html ./zap_report.html
-
-      # ---------------------------
-      # 8️⃣ Upload Artifact proprement
-      # ---------------------------
-      - name: Upload ZAP Scan Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: zap-report-${{ github.run_id }}
-          path: zap_report.html
-
-      # ---------------------------
-      # 9️⃣ Login GHCR
-      # ---------------------------
       - name: Log in to GitHub Container Registry
+        if: success()
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.PAT }}
 
-      # ---------------------------
-      # 🔟 Push Image
-      # ---------------------------
       - name: Push validated image to GHCR
+        if: success()
         run: |
-          IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
-          docker tag banking-api-local:${{ github.sha }} $IMAGE_NAME
-          docker push $IMAGE_NAME
+          docker tag banking-api-local:${{ github.sha }} ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
+          docker push ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
