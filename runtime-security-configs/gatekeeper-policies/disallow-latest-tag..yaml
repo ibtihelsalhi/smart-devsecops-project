@@ -1,4 +1,3 @@
-# .github/workflows/main.yaml
 name: Smart DevSecOps CI/CD Pipeline
 
 on:
@@ -11,7 +10,7 @@ jobs:
     name: Full Security Pipeline
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write       # nécessaire pour GitHub Pages
       packages: write
       actions: write
       security-events: write
@@ -73,26 +72,39 @@ jobs:
           echo "Waiting 20 seconds for the application to start..."
           sleep 20
 
-      - name: 'SECURITY: Run OWASP ZAP Baseline Scan'
-        uses: zaproxy/action-baseline@v0.10.0
-        with:
-          target: 'http://localhost:5000/'
-          fail_action: false
-          allow_issue_writing: false     # 🧠 désactive la création auto d’issues
-          allow_artifact_upload: false 
+      # ---------------------------
+      # 7️⃣ OWASP ZAP via Docker (sans bug d’artefact)
+      # ---------------------------
+      - name: Run OWASP ZAP Baseline Scan (Manual Docker)
+        run: |
+          docker run --network host \
+            -v $(pwd):/zap/wrk/:rw \
+            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+            -t http://localhost:5000 \
+            -r zap_report.html || true
 
       # ---------------------------
-      # 7️⃣ Sauvegarder le rapport ZAP comme artefact
+      # 8️⃣ Upload manuel du rapport ZAP
       # ---------------------------
-      - name: Upload ZAP Scan Report
+      - name: Upload ZAP Report
         uses: actions/upload-artifact@v4
         with:
-          name: zap_scan
-          path: ./zap_scan.html
-        continue-on-error: true
+          name: zap_report
+          path: zap_report.html
 
       # ---------------------------
-      # 8️⃣ Connexion à GitHub Container Registry (GHCR)
+      # 9️⃣ Publication du rapport ZAP sur GitHub Pages (bonus)
+      # ---------------------------
+      - name: Publish ZAP Report to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          publish_branch: gh-pages
+          keep_files: true
+
+      # ---------------------------
+      # 🔟 Connexion à GitHub Container Registry (GHCR)
       # ---------------------------
       - name: Log in to GitHub Container Registry
         if: success()
@@ -100,14 +112,4 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.PAT }}
-
-      # ---------------------------
-      # 9️⃣ Push de l'image validée dans GHCR
-      # ---------------------------
-      - name: Push validated image to GHCR
-        if: success()
-        run: |
-          IMAGE_NAME=ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
-          docker tag banking-api-local:${{ github.sha }} $IMAGE_NAME
-          docker push $IMAGE_NAME
+          password: ${{ secrets
