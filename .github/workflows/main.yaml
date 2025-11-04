@@ -11,39 +11,38 @@ jobs:
   security-pipeline:
     name: Full Security Pipeline
     runs-on: ubuntu-latest
-    permissions: write-all # Utilise la permission la plus simple pour éviter tout blocage
+    permissions: write-all # Donne toutes les permissions nécessaires
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       # --- ÉTAPE 2 : SCANS STATIQUES ---
-      # Tous les scans suivants sont configurés pour ne pas bloquer le pipeline.
-      # Ils s'exécuteront, afficheront leurs rapports dans les logs, et continueront.
+      # Tous les scans suivants sont configurés pour ne pas bloquer le pipeline pour ce test.
       
       - name: 'SECURITY: Scan for secrets with Gitleaks'
         uses: gitleaks/gitleaks-action@v2
-        continue-on-error: true # Ne bloque pas le pipeline
+        continue-on-error: true
 
       - name: 'SECURITY: Scan source code with Semgrep'
         uses: semgrep/semgrep-action@v1
         with:
           config: "auto"
-        continue-on-error: true # Ne bloque pas le pipeline
+        continue-on-error: true
 
       - name: 'SECURITY: Scan IaC files with Checkov'
         uses: bridgecrewio/checkov-action@master
         with:
           directory: ./kubernetes
-          soft_fail: true # Ne bloque pas le pipeline
+          soft_fail: true
 
       - name: 'SECURITY: Scan dependencies with Trivy (SCA)'
-        uses: aqusecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@master # <--- CORRIGÉ ICI
         with:
           scan-type: 'fs'
-          scan-ref: '../app-bancaire'
+          scan-ref: './app-bancaire'
           format: 'table'
-          exit-code: '0' # Ne bloque pas le pipeline
+          exit-code: '0'
 
       # --- ÉTAPE 3 : CONSTRUIRE L'IMAGE ---
       - name: Build Docker image locally
@@ -55,12 +54,12 @@ jobs:
 
       # --- ÉTAPE 4 : SCAN DE L'IMAGE ---
       - name: 'SECURITY: Scan Docker image with Trivy'
-        uses: aqusecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@master # <--- CORRIGÉ ICI
         with:
           scan-type: 'image'
           image-ref: 'banking-api-local:${{ github.sha }}'
           format: 'table'
-          exit-code: '0' # Ne bloque pas le pipeline
+          exit-code: '0'
 
       # --- ÉTAPE 5 : SCAN DYNAMIQUE (DAST) ---
       - name: Run application in background for DAST scan
@@ -73,19 +72,16 @@ jobs:
         uses: zaproxy/action-baseline@v0.10.0
         with:
           target: 'http://localhost:5000/'
-          # --- CONFIGURATION IMPORTANTE POUR LE TEST ---
-          fail_action: false   # Ne bloque pas le pipeline
-          issue_title: 'DAST Scan Report' # Donne un titre pour éviter la création de multiples issues
-          # L'erreur venait probablement de 'artifact_name', donc on ne l'utilise plus.
-          # ZAP génère des rapports par défaut (report_html.html, etc.) que l'on peut uploader.
-
+          fail_action: false
+          issue_title: 'DAST Scan Report'
+          
       # --- ÉTAPE 6 : SAUVEGARDER LES RAPPORTS ---
-      # On va uploader le rapport HTML de ZAP pour pouvoir le consulter.
       - name: Upload ZAP Report
         uses: actions/upload-artifact@v4
         with:
           name: zap-html-report
           path: 'report_html.html'
+          if-no-files-found: ignore # Ignore cette étape si le fichier n'est pas trouvé
 
       # --- ÉTAPE 7 : PUSH DE L'IMAGE À LA FIN ---
       - name: Log in to GitHub Container Registry
