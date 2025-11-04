@@ -16,7 +16,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Pour la démo, Gitleaks et Semgrep sont en mode non-bloquant
+      # --- SCANS STATIQUES ---
+      # (Configurés pour ne pas bloquer, afin de voir le rapport complet)
       - name: 'SECURITY: Scan for secrets with Gitleaks'
         uses: gitleaks/gitleaks-action@v2
         continue-on-error: true
@@ -26,7 +27,7 @@ jobs:
         with:
           config: "auto"
         continue-on-error: true
-        
+
       - name: 'SECURITY: Scan IaC files with Checkov'
         uses: bridgecrewio/checkov-action@master
         with:
@@ -41,4 +42,46 @@ jobs:
           format: 'table'
           exit-code: '0'
 
-      # Le reste du pipeline est désactivé pour la simplicité de la démo
+      # --- CONSTRUCTION DE L'IMAGE ---
+      - name: Build Docker image locally
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app-bancaire
+          load: true
+          tags: banking-api-local:${{ github.sha }}
+
+      # --- SCAN DE L'IMAGE ---
+      - name: 'SECURITY: Scan Docker image with Trivy'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          image-ref: 'banking-api-local:${{ github.sha }}'
+          format: 'table'
+          exit-code: '0'
+
+      # --- NOUVELLE ÉTAPE DAST AVEC UNE AUTRE ACTION ZAP ---
+      - name: 'SECURITY: Run OWASP ZAP Full Scan'
+        uses: zaproxy/action-full-scan@v0.10.0
+        with:
+          # On démarre notre application dans un conteneur Docker.
+          # L'action ZAP va automatiquement la trouver et la scanner.
+          docker_name: 'banking-api-local:${{ github.sha }}'
+          # On ne bloque pas le pipeline pour la démo
+          fail_action: false
+          # On ne crée pas d'issue pour ne pas polluer
+          create_issue: false
+
+      # --- PUSH DE L'IMAGE À LA FIN ---
+      - name: Log in to GitHub Container Registry
+        if: success()
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push validated image to GHCR
+        if: success()
+        run: |
+          docker tag banking-api-local:${{ github.sha }} ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
+          docker push ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
