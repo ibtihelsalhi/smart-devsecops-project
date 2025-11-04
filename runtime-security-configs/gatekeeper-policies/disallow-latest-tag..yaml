@@ -1,62 +1,47 @@
-# .github/workflows/main.yaml
-name: Smart DevSecOps CI/CD Pipeline
+# Fichier Unique : policy-disallow-latest-tag.yaml
 
-on:
-  push:
-    branches: [ "main" ]
-  workflow_dispatch:
+# --- PARTIE 1 : Le Modèle (La "Recette") ---
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8sdisallowlatesttag
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sDisallowLatestTag
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8sdisallowlatesttag
 
-jobs:
-  security-pipeline:
-    name: Full Security Pipeline
-    runs-on: ubuntu-latest
-    permissions: write-all
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.containers[_]
+          endswith(container.image, ":latest")
+          msg := sprintf("Image <%v> uses the 'latest' tag in container <%v>, which is not allowed", [container.image, container.name])
+        }
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.initContainers[_]
+          endswith(container.image, ":latest")
+          msg := sprintf("Image <%v> uses the 'latest' tag in initContainer <%v>, which is not allowed", [container.image, container.name])
+        }
 
-      - name: 'SECURITY: Scan IaC files with Checkov'
-        uses: bridgecrewio/checkov-action@master
-        with:
-          directory: ./kubernetes
-          soft_fail: true
+        violation[{"msg": msg}] {
+          container := input.review.object.spec.ephemeralContainers[_]
+          endswith(container.image, ":latest")
+          msg := sprintf("Image <%v> uses the 'latest' tag in ephemeralContainer <%v>, which is not allowed", [container.image, container.name])
+        }
 
-      - name: 'SECURITY: Scan dependencies with Trivy (SCA)'
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: './app-bancaire'
-          format: 'table'
-          exit-code: '0'
+--- # <--- SÉPARATEUR TRÈS IMPORTANT
 
-      - name: Build Docker image locally
-        uses: docker/build-push-action@v5
-        with:
-          context: ./app-bancaire
-          load: true
-          tags: banking-api-local:${{ github.sha }}
-
-      - name: 'SECURITY: Scan Docker image with Trivy'
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'image'
-          image-ref: 'banking-api-local:${{ github.sha }}'
-          format: 'table'
-          exit-code: '0'
-      
-      # L'ÉTAPiE ZAP A ÉTÉ SUPPRIMÉE
-
-      - name: Log in to GitHub Container Registry
-        if: success()
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.PAT }}
-
-      - name: Push validated image to GHCR
-        if: success()
-        run: |
-          docker tag banking-api-local:${{ github.sha }} ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
-          docker push ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
+# --- PARTIE 2 : La Contrainte (L'Application de la "Loi") ---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sDisallowLatestTag
+metadata:
+  name: no-latest-tags
+spec:
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
