@@ -78,8 +78,8 @@ jobs:
         with:
           target: 'http://localhost:5000/'
           fail_action: false
-          artifact_name: hii
-        continue-on-error: true
+          allow_issue_writing: false     # 🧠 désactive la création auto d’issues
+          allow_artifact_upload: false 
 
       # ---------------------------
       # 7️⃣ Sauvegarder le rapport ZAP comme artefact
