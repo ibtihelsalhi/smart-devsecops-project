@@ -1,8 +1,10 @@
-# kubernetes/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: banking-api-deployment
+  namespace: banking-app
+  labels:
+    app: banking-api
 spec:
   replicas: 1
   selector:
@@ -13,9 +15,34 @@ spec:
       labels:
         app: banking-api
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: banking-api
-        image: banking-api:v1
-        imagePullPolicy: IfNotPresent
+        # Cette image sera utilisée par le pipeline GitHub
+        image: ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
+        imagePullPolicy: Always
         ports:
         - containerPort: 5000
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+          limits:
+            cpu: "250m"
+            memory: "256Mi"
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
