@@ -25,7 +25,7 @@ jobs:
         with:
           directory: ./kubernetes
           # On exclut les fichiers de test
-          skip_file: kubernetes/test-*.yaml
+          args: --skip-file kubernetes/test-bad-pod.yaml --skip-file kubernetes/test-no-label-pod.yaml
           soft_fail: true
 
       # --- BUILD ET PUSH DE L'IMAGE ---
