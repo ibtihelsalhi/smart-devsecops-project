@@ -28,7 +28,7 @@ jobs:
           args: --skip-file kubernetes/test-bad-pod.yaml --skip-file kubernetes/test-no-label-pod.yaml
           soft_fail: true
 
-      # --- BUILD ET PUSH DE L'IMAGE ---
+      # --- BUILD ET PUllllSH DE L'IMAGE ---
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
