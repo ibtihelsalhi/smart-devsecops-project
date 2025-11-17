@@ -23,9 +23,9 @@ spec:
           type: RuntimeDefault
       containers:
       - name: banking-api
-        # Cette image sera utilisée par le pipeline GitHub
-        image: ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
-        imagePullPolicy: Always
+        # Cette image est un placeholder. Le pipeline la remplacera.
+        image: banking-api:v1
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5000
         securityContext:
@@ -33,6 +33,18 @@ spec:
           readOnlyRootFilesystem: true
           capabilities:
             drop: ["ALL"]
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
         resources:
           requests:
             cpu: "100m"
