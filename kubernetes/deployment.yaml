@@ -23,7 +23,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: banking-api
-        # Cette image est un placeholder. Le pipeline la remplacera.
+        # Cette image est unNNNN placeholder. Le pipeline la remplacera.
         image: banking-api:v1
         imagePullPolicy: IfNotPresent
         ports:
