@@ -1,3 +1,4 @@
+# .github/workflows/main.yaml (VERSION SIMPLIFIÉE ET CORRIGÉE)
 name: Smart DevSecOps CI/CD Pipeline
 
 on:
@@ -18,28 +19,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # --- SCANS "SHIFT-LEFT" ---
-      - name: 'SECURITY: Scan IaC files with Checkov (excluding test files)'
+      # --- SCAN IAC "SHIFT-LEFT" ---
+      - name: 'SECURITY: Scan IaC files with Checkov'
         uses: bridgecrewio/checkov-action@master
         with:
           directory: ./kubernetes
-          # On scanne tout sauf les fichiers de test
-          external_checks_dirs: kubernetes/!(test-*.yaml) 
+          # On exclut les fichiers de test
+          skip_file: kubernetes/test-*.yaml
           soft_fail: true
-
-      - name: 'SECURITY: Scan dependencies with Trivy (SCA)'
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: './app-bancaire'
-          format: 'sarif'
-          output: 'trivy-sca-results.sarif'
-          exit-code: '0'
-
-      - name: Upload Trivy SCA scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: 'trivy-sca-results.sarif'
 
       # --- BUILD ET PUSH DE L'IMAGE ---
       - name: Log in to GitHub Container Registry
@@ -47,7 +34,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.PAT }} # Assurez-vous que ce secret existe dans les paramètres de votre dépôt
+          password: ${{ secrets.PAT }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -56,15 +43,18 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
 
-      # --- SCAN DE L'IMAGE DÉJÀ POUSSÉE ---
+      # --- SCAN DE L'IMAGE (QUI INCLUT LE SCA) ---
       - name: 'SECURITY: Scan pushed Docker image with Trivy'
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: 'ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}'
           format: 'sarif'
           output: 'trivy-image-results.sarif'
-          exit-code: '0'
+          exit-code: '0' # On ne bloque pas le pipeline
+          # On scanne les vulnérabilités ET les secrets
+          scanners: 'vuln,secret' 
 
+      # --- UPLOAD DU RAPPORT UNIQUE DE TRIVY ---
       - name: Upload Trivy image scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
