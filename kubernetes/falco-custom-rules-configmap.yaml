@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: falco-custom-rules
+  namespace: falco
+  labels:
+    app.kubernetes.io/name: falco
+    falco.falcosecurity.org/rules: "true" # Ce label est magique pour Falco
+data:
+  custom-rules.yaml: |
+    - rule: Read sensitive file in banking pod
+      desc: An attempt to read /etc/passwd was made in the banking-api pod.
+      condition: open_read and container.image contains 'banking-api' and fd.name = /etc/passwd
+      output: "SUSPICIOUS ACTIVITY: Sensitive file /etc/passwd opened in banking pod (user=%user.name command=%proc.cmdline)"
+      priority: WARNING

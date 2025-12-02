@@ -1,4 +1,3 @@
-# runtime-security-configs/falco-rules/custom-rules.yaml
 - rule: Read sensitive file in banking pod
   desc: An attempt to read /etc/passwd was made in the banking-api pod.
   condition: open_read and container.image contains 'banking-api' and fd.name = /etc/passwd

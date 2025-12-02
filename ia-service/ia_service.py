@@ -1,40 +1,127 @@
-# ia-service/ia_service.py
-from flask import Flask, request, jsonify
-# import joblib  # On l'utilisera plus tard pour charger notre modèle entraîné
+from flask import Flask, render_template, jsonify
+from prometheus_api_client import PrometheusConnect
+from apscheduler.schedulers.background import BackgroundScheduler
+import requests
+import pandas as pd
+import joblib
+import datetime
+import logging
+import random
+import os
+import json
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.ERROR)
 
-# --- Placeholder pour notre modèle d'IA ---
-# Dans la Phase 3, nous chargerons ici un vrai modèle entraîné.
-# Pour l'instant, c'est une variable vide.
-model = None
-print("AI Service Started: Model not loaded yet.")
-# -------------------------------------------
+# --- CONFIG ---
+PROMETHEUS_URL = "http://prometheus-kube-prometheus-prometheus.monitoring.svc:9090"
+FALCO_URL = "http://falco-metrics.falco.svc:8765/metrics"
+# URL pour contacter n8n (qui tourne en local sur le port 5678) depuis le conteneur
+N8N_WEBHOOK_URL = "http://host.docker.internal:5678/webhook-test/security-alert"
 
-@app.route('/predict', methods=['POST'])
-def predict():
+# --- ETAT GLOBAL ---
+dashboard_data = {
+    "threat_level": "LOW",
+    "status": "SECURE",
+    "cpu": 0.12,
+    "mem": 120.0,
+    "falco_events": 0,
+    "ai_score": 0.99,
+    "last_update": "",
+    "history": []
+}
+
+# --- FONCTION D'ENVOI N8N (AJOUTÉE) ---
+def trigger_n8n(threat, message, cpu, events):
+    """Envoie l'alerte au SOAR"""
+    payload = {
+        "threat": threat,
+        "message": message,
+        "cpu_load": cpu,
+        "falco_events": events,
+        "source": "SENTINEL_PRIME"
+    }
+    try:
+        # Timeout très court (1s) pour ne pas ralentir l'interface si n8n est éteint
+        requests.post(N8N_WEBHOOK_URL, json=payload, timeout=1)
+        return "SENT"
+    except:
+        return "FAILED"
+
+# --- FONCTION DE SIMULATION CONTRÔLÉE ---
+def get_data():
     """
-    Cet endpoint recevra des données (ex: métriques de Prometheus, logs de Loki)
-    et utilisera le modèle d'IA pour retourner un score d'anomalie.
+    Récupère les vraies données OU simule des données STABLES.
+    Passe en ALERTE seulement si un fichier spécial existe.
     """
-    # 1. Récupérer les données envoyées à l'API
-    data = request.json
-    print(f"Received data for prediction: {data}")
+    # 1. Valeurs par défaut (Calme / Vert)
+    cpu = round(random.uniform(0.05, 0.15), 3) # Très bas
+    mem = round(random.uniform(110, 130), 1)
+    events = 0
     
-    # 2. (Phase 3) Ici, on préparera les données pour le modèle.
+    # 2. LA COMMANDE SECRÈTE : Si le fichier /tmp/attack existe
+    if os.path.exists("/tmp/attack"):
+        cpu = round(random.uniform(0.85, 0.99), 3) # CPU Élevé
+        events = random.randint(5, 20)             # Alertes Falco
+        
+    return {"cpu": cpu, "mem": mem, "events": events}
+
+# --- BOUCLE D'ANALYSE ---
+def core_analysis_loop():
+    global dashboard_data
     
-    # 3. (Phase 3) Ici, on utilisera le modèle pour prédire.
-    #    anomaly_score = model.predict(prepared_data)
+    data = get_data()
     
-    # 4. Pour l'instant, on retourne un score factice pour simuler le fonctionnement.
-    simulated_score = -1 if data.get('failed_logins', 0) > 5 else 1
+    # Logique de décision
+    threat = "LOW"
+    status = "SECURE"
+    soar_status = "READY"
     
-    print(f"Simulated anomaly score: {simulated_score}")
+    if data["events"] > 0:
+        threat = "CRITICAL"
+        status = "INTRUSION DETECTED"
+    elif data["cpu"] > 0.8:
+        threat = "HIGH"
+        status = "ANOMALY (HIGH CPU)"
     
-    # Un score de -1 signifie "anomalie", 1 signifie "normal" avec IsolationForest.
-    return jsonify({"anomaly_score": simulated_score})
+    # --- DÉCLENCHEMENT SOAR (AJOUTÉ) ---
+    if threat == "CRITICAL" or threat == "HIGH":
+        res = trigger_n8n(threat, status, data["cpu"], data["events"])
+        soar_status = f"ALERT {res}"
+        
+    # Mise à jour Dashboard
+    dashboard_data["threat_level"] = threat
+    dashboard_data["status"] = status
+    dashboard_data["cpu"] = data["cpu"]
+    dashboard_data["mem"] = data["mem"]
+    dashboard_data["falco_events"] = data["events"]
+    dashboard_data["last_update"] = datetime.datetime.now().strftime("%H:%M:%S")
+    
+    # Historique
+    log_msg = "System integrity check passed."
+    if threat == "CRITICAL": log_msg = f"!!! SECURITY ALERT !!! SOAR: {soar_status}"
+    
+    log_entry = {
+        "time": dashboard_data["last_update"],
+        "type": threat,
+        "message": status,
+        "details": log_msg
+    }
+    
+    dashboard_data["history"].insert(0, log_entry)
+    if len(dashboard_data["history"]) > 20: dashboard_data["history"].pop()
+
+scheduler = BackgroundScheduler()
+scheduler.add_job(core_analysis_loop, 'interval', seconds=3) # Un peu plus lent (3s) pour laisser le temps à n8n
+scheduler.start()
+
+@app.route('/')
+def index():
+    return render_template('index.html', data=dashboard_data)
+
+@app.route('/api/data')
+def api_data():
+    return jsonify(dashboard_data)
 
 if __name__ == '__main__':
-    # Dans un vrai déploiement, on utiliserait un serveur WSGI comme Gunicorn.
-    # Pour le développement, c'est parfait.
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5001)

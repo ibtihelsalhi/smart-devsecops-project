@@ -1,0 +1,18 @@
+    apiVersion: monitoring.coreos.com/v1
+    kind: ServiceMonitor
+    metadata:
+      name: banking-api-servicemonitor
+      # IMPORTANT : Le namespace où se trouve votre service
+      namespace: default 
+      # IMPORTANT : Ce label est ce qui permet à Prometheus de le trouver
+      labels:
+        release: monitoring
+    spec:
+      selector:
+        matchLabels:
+          # On cible les services qui ont cette étiquette
+          app: banking-api
+      endpoints:
+      - port: http # On utilise le nom du port que nous avons ajouté
+        path: /metrics
+        interval: 15s

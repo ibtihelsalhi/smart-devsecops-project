@@ -2,9 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: banking-api-deployment
-  namespace: banking-app
-  labels:
-    app: banking-api
+  # Correction : On utilise un namespace dédié
+  namespace: banking-app 
 spec:
   replicas: 1
   selector:
@@ -15,36 +14,40 @@ spec:
       labels:
         app: banking-api
     spec:
+      # Correction : On s'assure qu'aucun token n'est monté inutilement
       automountServiceAccountToken: false
+      # Correction : On applique un contexte de sécurité au Pod
       securityContext:
         runAsNonRoot: true
-        runAsUser: 65534
+        runAsUser: 1001 # Doit correspondre à l'UID créé dans le Dockerfile
         seccompProfile:
           type: RuntimeDefault
       containers:
       - name: banking-api
-        # Cette image est unNNNN placeholder. Le pipeline la remplacera.
-        image: banking-api:v1
+        image: banking-api:v2-secure # On utilise une nouvelle image "sécurisée"
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 5000
+        # Correction : On applique un contexte de sécurité au conteneur
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
           capabilities:
             drop: ["ALL"]
+        # Correction : On ajoute des sondes de santé
         livenessProbe:
           httpGet:
-            path: /
+            path: /login
             port: 5000
           initialDelaySeconds: 15
           periodSeconds: 20
         readinessProbe:
           httpGet:
-            path: /
+            path: /login
             port: 5000
           initialDelaySeconds: 5
           periodSeconds: 10
+        # Correction : On ajoute des limites de ressources
         resources:
           requests:
             cpu: "100m"
@@ -52,6 +55,7 @@ spec:
           limits:
             cpu: "250m"
             memory: "256Mi"
+        # On ajoute un volume temporaire car le filesystem est en lecture seule
         volumeMounts:
         - name: tmp
           mountPath: /tmp

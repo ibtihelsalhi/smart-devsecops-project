@@ -1,0 +1,38 @@
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: ia-service-deployment
+      # On le déploie dans le même namespace que Prometheus pour faciliter la communication
+      namespace: monitoring 
+      labels:
+        app: ia-service
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: ia-service
+      template:
+        metadata:
+          labels:
+            app: ia-service
+        spec:
+          containers:
+          - name: ia-service
+            # L'image que nous allons construire localement à la prochaine étape
+            image: ia-service:v1
+            imagePullPolicy: IfNotPresent
+            ports:
+            - containerPort: 5001
+            # Ajout de sondes de santé pour que Kubernetes sache s'il fonctionne
+            readinessProbe:
+              httpGet:
+                path: /
+                port: 5001
+              initialDelaySeconds: 5
+              periodSeconds: 10
+            livenessProbe:
+              httpGet:
+                path: /
+                port: 5001
+              initialDelaySeconds: 15
+              periodSeconds: 20

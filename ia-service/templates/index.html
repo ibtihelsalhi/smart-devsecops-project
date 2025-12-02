@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SENTINEL PRIME // SOC</title>
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #050505;
+            --panel-bg: rgba(16, 20, 24, 0.9);
+            --neon-blue: #00f3ff;
+            --neon-red: #ff0055;
+            --neon-green: #00ff9d;
+            --grid-line: rgba(0, 243, 255, 0.1);
+        }
+        body {
+            background-color: var(--bg-deep);
+            background-image: 
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 30px 30px;
+            color: #fff;
+            font-family: 'Rajdhani', sans-serif;
+            margin: 0; padding: 20px;
+            overflow-x: hidden;
+        }
+        
+        /* HEADER */
+        .top-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 2px solid var(--neon-blue); padding-bottom: 15px; margin-bottom: 30px;
+            text-shadow: 0 0 10px var(--neon-blue);
+        }
+        h1 { font-size: 2.5rem; margin: 0; letter-spacing: 5px; }
+        .blink { animation: blinker 1.5s linear infinite; color: var(--neon-red); font-weight: bold;}
+        @keyframes blinker { 50% { opacity: 0; } }
+
+        /* LAYOUT */
+        .dashboard-grid {
+            display: grid; grid-template-columns: 2fr 1fr; gap: 20px; height: 80vh;
+        }
+        .left-col { display: grid; grid-template-rows: 1fr 1fr; gap: 20px; }
+        .right-col { display: flex; flex-direction: column; gap: 20px; }
+
+        /* PANELS */
+        .panel {
+            background: var(--panel-bg); border: 1px solid var(--neon-blue);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.1);
+            padding: 15px; border-radius: 5px; position: relative;
+            overflow: hidden;
+        }
+        .panel-title { 
+            font-family: 'Share Tech Mono', monospace; color: var(--neon-blue); 
+            border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 10px; 
+        }
+
+        /* CHART SVG */
+        .chart-container {
+            width: 100%; height: 250px; position: relative;
+            border-bottom: 1px solid #333; border-left: 1px solid #333;
+        }
+        svg { width: 100%; height: 100%; }
+        polyline {
+            fill: none;
+            stroke: var(--neon-blue);
+            stroke-width: 2;
+            vector-effect: non-scaling-stroke;
+        }
+        .chart-grid { stroke: #333; stroke-width: 1; }
+
+        /* THREAT DISPLAY */
+        .threat-display { text-align: center; display: flex; flex-direction: column; justify-content: center; height: 100%; }
+        .threat-score { font-size: 5rem; font-weight: bold; line-height: 1; }
+        .threat-label { font-size: 1.5rem; letter-spacing: 3px; margin-top: 10px; }
+        .status-LOW { color: var(--neon-green); text-shadow: 0 0 20px var(--neon-green); }
+        .status-HIGH { color: var(--neon-red); text-shadow: 0 0 20px var(--neon-red); animation: shake 0.5s infinite; }
+        
+        @keyframes shake { 0% { transform: translate(1px, 1px) rotate(0deg); } 50% { transform: translate(-1px, 2px) rotate(-1deg); } 100% { transform: translate(1px, -2px) rotate(-1deg); } }
+
+        /* TERMINAL */
+        .terminal {
+            font-family: 'Share Tech Mono', monospace; font-size: 0.9em; color: var(--neon-green);
+            height: 100%; overflow-y: hidden; position: relative;
+        }
+        .log-line { margin: 2px 0; border-bottom: 1px solid #111; }
+        .log-time { color: #555; margin-right: 10px; }
+        .metric-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h1>SENTINEL<span style="color:var(--neon-blue)">PRIME</span> // SOC</h1>
+        <div>SYSTEM STATUS: <span style="color:var(--neon-green)">ONLINE</span> | <span class="blink">LIVE MONITORING</span></div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="left-col">
+            <div class="panel">
+                <div class="panel-title">>> REAL-TIME ANOMALY DETECTION</div>
+                <!-- GRAPHIQUE SVG SANS LIBRAIRIE -->
+                <div class="chart-container">
+                    <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+                        <!-- Lignes de grille -->
+                        <line x1="0" y1="25" x2="100" y2="25" class="chart-grid" />
+                        <line x1="0" y1="50" x2="100" y2="50" class="chart-grid" />
+                        <line x1="0" y1="75" x2="100" y2="75" class="chart-grid" />
+                        <!-- La courbe -->
+                        <polyline id="chart-line" points="0,100 10,100 20,100 30,100 40,100 50,100 60,100 70,100 80,100 90,100 100,100" />
+                    </svg>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-title">>> SYSTEM INTRUSION LOGS</div>
+                <div class="terminal" id="terminal-logs">Waiting for stream...</div>
+            </div>
+        </div>
+
+        <div class="right-col">
+            <div class="panel threat-display">
+                <div class="panel-title">THREAT LEVEL</div>
+                <div id="threat-val" class="threat-score status-LOW">0%</div>
+                <div id="threat-txt" class="threat-label status-LOW">SECURE</div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">>> INFRASTRUCTURE VITALS</div>
+                <div class="metric-row"><span>CPU LOAD</span> <span id="cpu-val" style="color:var(--neon-blue)">0.00</span></div>
+                <div class="metric-row"><span>MEMORY</span> <span id="mem-val" style="color:var(--neon-blue)">0 MB</span></div>
+                <div class="metric-row"><span>AI CONFIDENCE</span> <span style="color:var(--neon-green)">98.4%</span></div>
+                <div class="metric-row"><span>SOAR STATUS</span> <span id="soar-status" style="color:var(--neon-green)">ARMED</span></div>
+                <div class="metric-row"><span>LAST UPDATE</span> <span id="last-update" style="font-size:0.8em">--:--:--</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Données du graphique (20 points)
+        let chartData = Array(20).fill(0);
+
+        function updateDashboard() {
+            fetch('/api/data')
+                .then(response => response.json())
+                .then(data => {
+                    // --- 1. Mise à jour du Graphique (SVG) ---
+                    // On décale les données
+                    chartData.shift();
+                    
+                    // Si menace critique -> Pic à 100%, sinon valeur normale
+                    let newValue = (data.threat_level === "CRITICAL" || data.threat_level === "HIGH") ? 90 : (data.cpu * 100);
+                    if (newValue > 100) newValue = 100;
+                    if (newValue < 5) newValue = 5; // Bruit de fond minimum
+                    
+                    chartData.push(newValue);
+
+                    // On construit les points SVG
+                    // L'axe Y est inversé en SVG (0 est en haut, 100 en bas)
+                    let points = "";
+                    chartData.forEach((val, index) => {
+                        let x = index * 5; // 100 / 20 points = 5
+                        let y = 100 - val; // Inversion
+                        points += `${x},${y} `;
+                    });
+                    
+                    const line = document.getElementById('chart-line');
+                    line.setAttribute('points', points);
+                    
+                    // Changement de couleur si alerte
+                    if (data.threat_level === "CRITICAL") {
+                        line.style.stroke = "#ff0055";
+                        line.style.strokeWidth = "4";
+                    } else {
+                        line.style.stroke = "#00f3ff";
+                        line.style.strokeWidth = "2";
+                    }
+
+                    // --- 2. Mise à jour des Textes ---
+                    document.getElementById('cpu-val').innerText = data.cpu;
+                    document.getElementById('mem-val').innerText = data.mem;
+                    document.getElementById('last-update').innerText = data.last_update;
+
+                    const threatBox = document.getElementById('threat-val');
+                    const threatTxt = document.getElementById('threat-txt');
+                    const isCritical = data.threat_level === "CRITICAL" || data.threat_level === "HIGH";
+                    
+                    threatBox.innerText = data.threat_level;
+                    threatBox.className = isCritical ? "threat-score status-HIGH" : "threat-score status-LOW";
+                    threatTxt.innerText = data.status;
+                    threatTxt.className = isCritical ? "threat-label status-HIGH" : "threat-label status-LOW";
+
+                    const soarStat = document.getElementById('soar-status');
+                    if(isCritical) {
+                        soarStat.innerText = "ENGAGED";
+                        soarStat.style.color = "red";
+                    } else {
+                        soarStat.innerText = "ARMED";
+                        soarStat.style.color = "#00ff9d";
+                    }
+
+                    // --- 3. Mise à jour des Logs ---
+                    const terminal = document.getElementById('terminal-logs');
+                    let logHtml = "";
+                    data.history.slice(0, 8).forEach(log => {
+                        let color = log.type === "CRITICAL" || log.type === "HIGH" ? "#ff0055" : "#00ff9d";
+                        logHtml += `<div class="log-line">
+                            <span class="log-time">[${log.time}]</span> 
+                            <span style="color:${color}; font-weight:bold">[${log.type}]</span> 
+                            ${log.message}
+                        </div>`;
+                    });
+                    terminal.innerHTML = logHtml;
+                })
+                .catch(err => console.error("Erreur:", err));
+        }
+
+        // Mise à jour toutes les 2 secondes
+        setInterval(updateDashboard, 2000);
+        updateDashboard();
+    </script>
+</body>
+</html>
