@@ -57,4 +57,4 @@ jobs:
       #     path: |
       #       gitleaks-report.sarif
       #       trivy-report.sarif
-      #       checkov-report.sarif
+      #       checkov-report.sariffff
