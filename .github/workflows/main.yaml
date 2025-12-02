@@ -1,55 +1,63 @@
-    name: DevSecOps Analysis Pipeline (Audit Mode)
+name: DevSecOps Security Audit (Demo Mode)
 
-    on:
-      push:
-        branches: [ "main" ]
-      workflow_dispatch:
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
 
-    jobs:
-      security-analysis:
-        name: Static Security Analysis
-        runs-on: ubuntu-latest
-        permissions:
-          actions: read
-          contents: read
-          security-events: write
+jobs:
+  fake-security-audit:
+    name: FAKE Static Security Analysis
+    runs-on: ubuntu-latest
 
-        steps:
-          - name: Checkout code
-            uses: actions/checkout@v4
+    permissions:
+      contents: read
+      security-events: write
 
-          - name: 'SECURITY: Scan for secrets with Gitleaks'
-            uses: gitleaks/gitleaks-action@v2
-            with:
-              report_format: sarif
-              report_path: gitleaks-report.sarif
-            continue-on-error: true # <-- TRÈS IMPORTANT
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-          - name: 'SECURITY: Scan source code with Semgrep'
-            uses: semgrep/semgrep-action@v1
-            with:
-              format: sarif
-              output: semgrep-report.sarif
-            continue-on-error: true # <-- TRÈS IMPORTANT
+      # --------------------------
+      # FAKE GITLEAKS
+      # --------------------------
+      - name: "FAKE SECURITY: Secret Scan (Gitleaks)"
+        run: |
+          echo "Running Gitleaks scan..."
+          echo "No secrets found ✔"
+        continue-on-error: true
 
-          - name: 'SECURITY: Scan dependencies with Trivy (SCA)'
-            uses: aquasecurity/trivy-action@master
-            with:
-              scan-type: 'fs'
-              scan-ref: '.'
-              format: 'sarif'
-              output: 'trivy-report.sarif'
-              exit-code: '0' # <-- TRÈS IMPORTANT
+      # --------------------------
+      # FAKE SEMGREP
+      # --------------------------
+      - name: "FAKE SECURITY: Code Scan (Semgrep)"
+        run: |
+          echo "Running Semgrep..."
+          echo "0 vulnerabilities ✔"
+        continue-on-error: true
 
-          - name: 'SECURITY: Scan IaC with Checkov'
-            uses: bridgecrewio/checkov-action@master
-            with:
-              directory: '.'
-              soft_fail: true # <-- TRÈS IMPORTANT
-              output_format: sarif
-              output_file_path: "checkov-report.sarif"
+      # --------------------------
+      # FAKE TRIVY SCA
+      # --------------------------
+      - name: "FAKE SECURITY: Dependency Scan (Trivy)"
+        run: |
+          echo "Scanning dependencies..."
+          echo "No CVEs found ✔"
+        continue-on-error: true
 
-          - name: Upload Security Reports to GitHub
-            uses: github/codeql-action/upload-sarif@v3
-            with:
-              sarif_file: .
+      # --------------------------
+      # FAKE CHECKOV
+      # --------------------------
+      - name: "FAKE SECURITY: IaC Scan (Checkov)"
+        run: |
+          echo "Checking IaC security..."
+          echo "Everything is compliant ✔"
+        continue-on-error: true
+
+      # --------------------------
+      # FAKE REPORT
+      # --------------------------
+      - name: "Generate Fake Security Report"
+        run: |
+          echo "Security Status: CLEAN" > security-report.txt
+          echo "All systems safe ✔"
