@@ -19,7 +19,7 @@
           - name: Checkout code
             uses: actions/checkout@v4
 
-          # --- VERSION "FAKE" DES SCANS ---
+          # --- VERSION "FAKE" DES SCmmmmANS ---
 
           - name: 'SECURITY: Scan for secrets with Gitleaks'
             uses: gitleaks/gitleaks-action@v2
