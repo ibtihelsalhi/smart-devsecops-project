@@ -1,61 +1,61 @@
-name: Smart DevSecOps CI/CD Pipeline
+    name: DevSecOps Analysis Pipeline
 
-on:
-  push:
-    branches: [ "main" ]
-  workflow_dispatch:
+    on:
+      push:
+        branches: [ "main" ]
+      workflow_dispatch:
 
-jobs:
-  build-and-scan:
-    name: Build, Scan and Push Image
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      security-events: write
+    jobs:
+      security-analysis:
+        name: Static Security Analysis
+        runs-on: ubuntu-latest
+        permissions:
+          actions: read
+          contents: read
+          security-events: write
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+        steps:
+          - name: Checkout code
+            uses: actions/checkout@v4
 
-      # --- SCAN IAC "SHIFT-LEFT" ---
-      - name: 'SECURITY: Scan IaC files with Checkov'
-        uses: bridgecrewio/checkov-action@master
-        with:
-          directory: ./kubernetes
-          # LA BONNE SYNTAXE pour ignorer des fichiers
-          skip-file: |
-            kubernetes/test-bad-pod.yaml
-            kubernetes/test-no-label-pod.yaml
-          soft_fail: true
+          - name: 'SECURITY: Scan for secrets with Gitleaks'
+            uses: gitleaks/gitleaks-action@v2
+            with:
+              report_format: sarif
+              report_path: gitleaks-report.sarif
+            continue-on-error: true
 
-      # --- BUILD ET PUSH DE L'IMAGE ---
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.PAT }}
+          - name: 'SECURITY: Scan source code with Semgrep'
+            uses: semgrep/semgrep-action@v1
+            with:
+              config: "auto"
+              format: "sarif"
+              output: "semgrep-report.sarif"
+            continue-on-error: true
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./app-bancaire
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}
+          - name: 'SECURITY: Scan dependencies with Trivy (SCA)'
+            uses: aquasecurity/trivy-action@master
+            with:
+              scan-type: 'fs'
+              scan-ref: '.'
+              format: 'sarif'
+              output: 'trivy-sca-report.sarif'
+              exit-code: '0'
 
-      # --- SCAN DE L'IMAGE (QUI INCLUT LE SCA) ---
-      - name: 'SECURITY: Scan pushed Docker image with Trivy'
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'ghcr.io/${{ github.repository_owner }}/banking-api:${{ github.sha }}'
-          format: 'sarif'
-          output: 'trivy-image-results.sarif'
-          exit-code: '0' 
-          scanners: 'vuln,secret'
+          - name: 'SECURITY: Scan IaC with Checkov'
+            uses: bridgecrewio/checkov-action@master
+            with:
+              directory: '.'
+              soft_fail: true
+              output_format: sarif
+              output_file_path: "checkov-report.sarif"
 
-      # --- UPLOAD DU RAPPORT UNIQUE DE TRIVY ---
-      - name: Upload Trivy image scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: 'trivy-image-results.sarif'
+          - name: Upload Security Reports
+            uses: actions/upload-artifact@v4
+            with:
+              name: security-scan-reports
+              path: |
+                gitleaks-report.sarif
+                semgrep-report.sarif
+                trivy-sca-report.sarif
+                checkov-report.sarif
