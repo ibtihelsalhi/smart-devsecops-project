@@ -1,61 +1,60 @@
-    name: DevSecOps Analysis Pipeline
+name: DevSecOps Analysis Pipeline (Non-Blocking)
 
-    on:
-      push:
-        branches: [ "main" ]
-      workflow_dispatch:
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
 
-    jobs:
-      security-analysis:
-        name: Static Security Analysis
-        runs-on: ubuntu-latest
-        permissions:
-          actions: read
-          contents: read
-          security-events: write
+jobs:
+  security-analysis:
+    name: Static Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
 
-        steps:
-          - name: Checkout code
-            uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-          - name: 'SECURITY: Scan for secrets with Gitleaks'
-            uses: gitleaks/gitleaks-action@v2
-            with:
-              report_format: sarif
-              report_path: gitleaks-report.sarif
-            continue-on-error: true
+      - name: 'SECURITY: Scan for secrets with Gitleaks'
+        uses: gitleaks/gitleaks-action@v2
+        # On dit à l'étape de continuer même si Gitleaks trouve des secrets et échoue
+        continue-on-error: true
 
-          - name: 'SECURITY: Scan source code with Semgrep'
-            uses: semgrep/semgrep-action@v1
-            with:
-              config: "auto"
-              format: "sarif"
-              output: "semgrep-report.sarif"
-            continue-on-error: true
+      - name: 'SECURITY: Scan source code with Semgrep'
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: "auto"
+        # On dit à l'étape de continuer même si Semgrep trouve des failles
+        continue-on-error: true
 
-          - name: 'SECURITY: Scan dependencies with Trivy (SCA)'
-            uses: aquasecurity/trivy-action@master
-            with:
-              scan-type: 'fs'
-              scan-ref: '.'
-              format: 'sarif'
-              output: 'trivy-sca-report.sarif'
-              exit-code: '0'
+      - name: 'SECURITY: Scan dependencies with Trivy (SCA)'
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-report.sarif'
+          # On dit à Trivy de ne jamais échouer, quel que soit le résultat
+          exit-code: '0'
 
-          - name: 'SECURITY: Scan IaC with Checkov'
-            uses: bridgecrewio/checkov-action@master
-            with:
-              directory: '.'
-              soft_fail: true
-              output_format: sarif
-              output_file_path: "checkov-report.sarif"
+      - name: 'SECURITY: Scan IaC with Checkov'
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: '.'
+          # On dit à Checkov de ne pas faire échouer le pipeline
+          soft_fail: true
+          output_format: sarif
+          output_file_path: "checkov-report.sarif"
 
-          - name: Upload Security Reports
-            uses: actions/upload-artifact@v4
-            with:
-              name: security-scan-reports
-              path: |
-                gitleaks-report.sarif
-                semgrep-report.sarif
-                trivy-sca-report.sarif
-                checkov-report.sarif
+      # Cette étape n'est pas nécessaire si vous ne montrez que les résultats des scans
+      # - name: Upload Security Reports
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: security-scan-reports
+      #     path: |
+      #       gitleaks-report.sarif
+      #       trivy-report.sarif
+      #       checkov-report.sarif
