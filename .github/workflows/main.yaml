@@ -1,9 +1,8 @@
-    name: DevSecOps Analysis Pipeline (Perfect Demo)
+    name: DevSecOps Analysis Pipeline (Audit Mode)
 
     on:
       push:
-        branches:
-          - feature/perfect-demo # Ne se déclenche que sur cette branche
+        branches: [ "main" ]
       workflow_dispatch:
 
     jobs:
@@ -19,19 +18,38 @@
           - name: Checkout code
             uses: actions/checkout@v4
 
-          # --- VERSION "FAKE" DES SCmmmmANS ---
-
           - name: 'SECURITY: Scan for secrets with Gitleaks'
             uses: gitleaks/gitleaks-action@v2
             with:
-              # On dit à Gitleaks d'ignorer notre fichier app.py
-              config_path: .github/gitleaks-config.toml
+              report_format: sarif
+              report_path: gitleaks-report.sarif
+            continue-on-error: true # <-- TRÈS IMPORTANT
 
           - name: 'SECURITY: Scan source code with Semgrep'
-            run: echo "Semgrep scan completed, no issues found."
+            uses: semgrep/semgrep-action@v1
+            with:
+              format: sarif
+              output: semgrep-report.sarif
+            continue-on-error: true # <-- TRÈS IMPORTANT
 
           - name: 'SECURITY: Scan dependencies with Trivy (SCA)'
-            run: echo "Trivy SCA scan completed, no issues found."
+            uses: aquasecurity/trivy-action@master
+            with:
+              scan-type: 'fs'
+              scan-ref: '.'
+              format: 'sarif'
+              output: 'trivy-report.sarif'
+              exit-code: '0' # <-- TRÈS IMPORTANT
 
           - name: 'SECURITY: Scan IaC with Checkov'
-            run: echo "Checkov IaC scan completed, no issues found."
+            uses: bridgecrewio/checkov-action@master
+            with:
+              directory: '.'
+              soft_fail: true # <-- TRÈS IMPORTANT
+              output_format: sarif
+              output_file_path: "checkov-report.sarif"
+
+          - name: Upload Security Reports to GitHub
+            uses: github/codeql-action/upload-sarif@v3
+            with:
+              sarif_file: .
