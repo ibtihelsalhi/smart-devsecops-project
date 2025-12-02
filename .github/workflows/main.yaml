@@ -1,4 +1,4 @@
-name: DevSecOps Analysis Pipeline (Perfect Demo)
+    name: DevSecOps Analysis Pipeline (Perfect Demo)
 
     on:
       push:
@@ -35,5 +35,3 @@ name: DevSecOps Analysis Pipeline (Perfect Demo)
 
           - name: 'SECURITY: Scan IaC with Checkov'
             run: echo "Checkov IaC scan completed, no issues found."
-
-          # Le reste du pipeline est désactivé pour garder la démo rapide et simple
